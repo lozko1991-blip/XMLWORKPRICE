@@ -574,12 +574,34 @@ function derivePattern(decorRaw, nameText) {
   return 'Однотонний';
 }
 
+// ── Запит з підтримкою редиректів (301/302/307/308) ──────────
+function getFollowRedirects(url, opts, hops) {
+  hops = hops || 0;
+  return new Promise((res, rej) => {
+    if (hops > 5) return rej(new Error('Too many redirects'));
+    https.get(url, opts, (r) => {
+      if (r.statusCode === 301 || r.statusCode === 302 ||
+          r.statusCode === 307 || r.statusCode === 308) {
+        r.resume(); // drain response
+        const loc = r.headers['location'];
+        if (!loc) return rej(new Error('Redirect: no Location header'));
+        const next = /^https?:\/\//.test(loc) ? loc : new URL(loc, url).href;
+        console.log('Redirect →', next);
+        getFollowRedirects(next, opts, hops + 1).then(res).catch(rej);
+      } else {
+        res(r);
+      }
+    }).on('error', rej);
+  });
+}
+
 // ── Завантаження та потокова обробка ─────────────────────────
 function downloadAndProcess() {
-  return new Promise((resolve, reject) => {
-    console.log('Завантажуємо:', SOURCE_URL);
+  const opts = { headers: { 'User-Agent': 'KastaFeedBuilder/2.0' } };
+  console.log('Завантажуємо:', SOURCE_URL);
 
-    https.get(SOURCE_URL, { headers: { 'User-Agent': 'KastaFeedBuilder/2.0' } }, (res) => {
+  return getFollowRedirects(SOURCE_URL, opts, 0).then(res => {
+    return new Promise((resolve, reject) => {
       if (res.statusCode !== 200) {
         reject(new Error('HTTP ' + res.statusCode));
         return;
@@ -631,7 +653,7 @@ function downloadAndProcess() {
       });
 
       res.on('error', reject);
-    }).on('error', reject);
+    });
   });
 }
 
