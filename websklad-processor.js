@@ -71,18 +71,23 @@ const NOISE_RE = [
   /(?:відео|видео)\s+(?:розпаковки|распаковки|передоплата|предоплата|запись)\b[^\n]*/gi,
 ];
 
-// ─── Очистка опису (з early-exit) ────────────────────────────────────────────
+// ─── Очистка опису — ЗАВЖДИ очищаємо HTML (GitHub Actions, немає ліміту CPU) ──
 function cleanDescription(offerXml) {
-  if (!NOISE_MARKERS.some(m => offerXml.includes(m))) return offerXml;
+  // Без early-exit: кожен оффер очищається від HTML → правильний XML
+  // (early-exit був потрібен тільки для Cloudflare, тут він шкодить)
   return offerXml.replace(
     /(<(?:description|body)\b[^>]*>)([\s\S]*?)(<\/(?:description|body)>)/gi,
     (full, open, content, close) => {
       let text = stripCdata(content);
       text = stripHtml(text);
-      for (const re of NOISE_RE) text = text.replace(re, '');
+      // Видаляємо шумові фрази тільки якщо вони є
+      if (NOISE_MARKERS.some(m => text.includes(m))) {
+        for (const re of NOISE_RE) text = text.replace(re, '');
+      }
       text = text.replace(/[ \t]{2,}/g, ' ').trim();
       return `${open}${escapeXml(text)}${close}`;
     }
+
   );
 }
 
