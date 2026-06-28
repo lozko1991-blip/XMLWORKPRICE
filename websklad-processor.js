@@ -15,7 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ─── Налаштування ─────────────────────────────────────────────────────────────
 const SOURCE_URL = 'https://www.websklad.biz.ua/wp-content/uploads/randomize_prom_84230.xml';
-const OUT_FILE   = 'websklad.xml';   // зберігається у кореневій теці (feeds гілка)
+const OUT_FILE   = 'websklad.xml';   // зберігається у кореневій теці
 const MIN_PRICE  = 150;              // товари дешевші → видаляємо
 
 // ─── HTTP fetch з підтримкою редіректів ──────────────────────────────────────
@@ -54,14 +54,21 @@ function stripCdata(xml) {
 function stripHtml(html) {
   return html
     .replace(/<!\[CDATA\[/gi, '').replace(/\]\]>/g, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"')
-    .replace(/&#\d+;/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
+    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#\d+;/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\r?\n([ \t]*\r?\n)+/g, '\n')
+    .replace(/ \n/g, '\n').replace(/\n /g, '\n')
+    .trim();
 }
 
 // ─── Шумові патерни (УК + РУ) ─────────────────────────────────────────────────
-const NOISE_MARKERS = ['🔴', '🎯', '👇', '👉', 'відео розп', 'видео расп'];
+const NOISE_MARKERS = ['🔴', '🎯', '👇', '👉', 'відео розп', 'видео расп', 'отримаєте такий', 'получите такой', 'отримаєте товар', 'получите товар'];
 
 const NOISE_RE = [
   /🔴[^🔴\n]{0,80}(?:ВІДЕО|ВИДЕО)\s+(?:РОЗПАКОВКИ|РАСПАКОВКИ)[^🔴\n]{0,80}🔴/gi,
@@ -69,14 +76,14 @@ const NOISE_RE = [
   /[👇👉][^👇👉\n]{0,70}(?:Детальніше|Подробнее|Детальнее)[^👇👉\n]{0,30}[👇👉]/gi,
   /[👇👉][^👇👉\n]{0,80}(?:видео|открыть)[^👇👉\n]{0,30}/gi,
   /(?:відео|видео)\s+(?:розпаковки|распаковки|передоплата|предоплата|запись)\b[^\n]*/gi,
+  /(?:🎯|✨)?\s*(?:Ви\s+отримаєте|Вы\s+получите)\s+(?:такий|такой)\s+товар[,\s]+(?:як|как)\s+на\s+(?:відео|видео)\s*!?\s*(?:👇)?/gi,
 ];
 
 // ─── Очистка опису — ЗАВЖДИ очищаємо HTML (GitHub Actions, немає ліміту CPU) ──
 function cleanDescription(offerXml) {
   // Без early-exit: кожен оффер очищається від HTML → правильний XML
-  // (early-exit був потрібен тільки для Cloudflare, тут він шкодить)
   return offerXml.replace(
-    /(<(?:description|body)\b[^>]*>)([\s\S]*?)(<\/(?:description|body)>)/gi,
+    /(<(?:description|description_ua|body|body_ua)\b[^>]*>)([\s\S]*?)(<\/(?:description|description_ua|body|body_ua)>)/gi,
     (full, open, content, close) => {
       let text = stripCdata(content);
       text = stripHtml(text);
@@ -87,7 +94,6 @@ function cleanDescription(offerXml) {
       text = text.replace(/[ \t]{2,}/g, ' ').trim();
       return `${open}${escapeXml(text)}${close}`;
     }
-
   );
 }
 
