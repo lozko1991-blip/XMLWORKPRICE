@@ -1,21 +1,10 @@
-# .github/workflows/websklad.yml
-#
-# Структура репозиторію lozko1991-blip/XMLWORKPRICE:
-#   main гілка:  websklad-processor.js   ← скрипт обробки
-#                .github/workflows/websklad.yml
-#   feeds гілка: websklad.xml            ← готовий фід (1 commit, без history!)
-#
-# Економія місця:
-#   60MB сирий прайс ніколи не потрапляє в git.
-#   В гілку feeds завжди force-push 1 commit → накопичення history відсутнє.
-
 name: Update websklad feed
 
 on:
   schedule:
-    # Кожні 4 години: 0:00 / 4:00 / 8:00 / 12:00 / 16:00 / 20:00 UTC
+    # Кожні 4 години
     - cron: '0 */4 * * *'
-  workflow_dispatch:   # Запуск вручну з GitHub UI → Actions → Run workflow
+  workflow_dispatch:   # Запуск вручну
 
 jobs:
   update-feed:
@@ -23,37 +12,31 @@ jobs:
     timeout-minutes: 15
 
     permissions:
-      contents: write   # потрібно для git push у feeds гілку
+      contents: write
 
     steps:
-      # 1. Клонуємо main (тут лежить скрипт)
       - name: Checkout main (скрипт)
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 1
 
-      # 2. Node.js 20 (підтримує ES Modules і вбудований fetch)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # 3. Запускаємо обробник → генерує websklad.xml у поточній теці
       - name: Run websklad processor
         run: node websklad-processor.js
 
-      # 4. Force-push websklad.xml у гілку feeds (1 commit без history)
-      - name: Push websklad.xml → feeds branch
+      - name: Push websklad.xml → feeds-websklad branch
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Створюємо або перемикаємось на сирітську гілку feeds (без history)
           git checkout --orphan feeds-tmp
           git reset --hard
 
-          # Копіюємо тільки готовий файл
           cp websklad.xml /tmp/websklad.xml
           git checkout --orphan feeds-new
           git reset --hard
@@ -62,5 +45,5 @@ jobs:
           git add websklad.xml
           git commit -m "feed: websklad $(date -u '+%Y-%m-%d %H:%M UTC')"
 
-          # Force-push → в гілці feeds завжди рівно 1 коміт
-          git push origin HEAD:feeds --force
+          # Направляємо у нову власну гілку feeds-websklad
+          git push origin HEAD:feeds-websklad --force
