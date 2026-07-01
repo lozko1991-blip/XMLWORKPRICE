@@ -1,6 +1,9 @@
 name: Update websklad feed
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     # Кожні 4 години
     - cron: '0 */4 * * *'
