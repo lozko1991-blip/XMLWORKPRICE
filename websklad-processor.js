@@ -15,7 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ─── Налаштування ─────────────────────────────────────────────────────────────
 const SOURCE_URL = 'https://www.websklad.biz.ua/wp-content/uploads/randomize_prom_84230.xml';
-const OUT_FILE   = 'websklad.xml';   // зберігається у кореневій теці
+const OUT_FILE   = 'websklad.xml';   // зберігається у кореневій теці (feeds гілка)
 const MIN_PRICE  = 150;              // товари дешевші → видаляємо
 
 // ─── HTTP fetch з підтримкою редіректів ──────────────────────────────────────
@@ -82,6 +82,7 @@ const NOISE_RE = [
 // ─── Очистка опису — ЗАВЖДИ очищаємо HTML (GitHub Actions, немає ліміту CPU) ──
 function cleanDescription(offerXml) {
   // Без early-exit: кожен оффер очищається від HTML → правильний XML
+  // (early-exit був потрібен тільки для Cloudflare, тут він шкодить)
   return offerXml.replace(
     /(<(?:description|description_ua|body|body_ua)\b[^>]*>)([\s\S]*?)(<\/(?:description|description_ua|body|body_ua)>)/gi,
     (full, open, content, close) => {
@@ -167,6 +168,10 @@ function isAvailable(offerXml) {
 // ─── Обробка одного офера ─────────────────────────────────────────────────────
 function processOffer(offerXml) {
   let out = stripCdata(offerXml);
+  
+  // Додаємо префікс 1818 до offer id, щоб уникнути дублів
+  out = out.replace(/(<offer\b[^>]*\bid=")([^"]+)(")/i, (m, prefix, id, suffix) => prefix + '1818' + id + suffix);
+
   out = cleanDescription(out);
   out = applyMarkup(out);
 
